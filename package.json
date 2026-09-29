@@ -1,0 +1,29 @@
+{
+  "name": "deepgram-voice-agent",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "node relay.mjs & next dev -p 3030",
+    "build": "next build",
+    "start": "node relay.mjs & next start -p 3030",
+    "test": "tsx lib/session.test.ts"
+  },
+  "dependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@withone/connect": "^0.9.0",
+    "next": "^16.3.6",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "ws": "^8.21.3"
+  },
+  "type": "module",
+  "license": "MIT",
+  "description": "A Deepgram voice agent that works in each user's own calendar, email, CRM and Notion through One Connect."
+}

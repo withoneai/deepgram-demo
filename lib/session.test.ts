@@ -1,0 +1,25 @@
+// Run: npx tsx lib/session.test.ts   (needs "type": "module" or an .mts name)
+export {};
+process.env.ONE_CLIENT_SECRET = "test-secret";
+const s = await import("./session.ts");
+const t = { accessToken: "a".repeat(1200), refreshToken: "r1", expiresAt: Date.now() + 3600e3 };
+const sealed = s.seal("u1", t);
+const ok = (name: string, v: boolean) => console.log(v ? "PASS" : "FAIL", name);
+ok("roundtrip", JSON.stringify(s.unseal(sealed, "u1")) === JSON.stringify(t));
+ok("other user rejected", s.unseal(sealed, "u2") === null);
+ok("tamper rejected", s.unseal(sealed.slice(0, -4) + "AAAA", "u1") === null);
+process.env.ONE_CLIENT_SECRET = "rotated"; ok("old secret rejected", s.unseal(sealed, "u1") === null); process.env.ONE_CLIENT_SECRET = "test-secret";
+const jar = (l: { name: string; value: string }[]) => ({ get: (n: string) => l.find((c) => c.name === n), getAll: () => l });
+const big = { ...t, accessToken: "a".repeat(5000) };
+const w = s.sessionCookieWrites("u1", big, jar([]));
+ok("chunks under 4KB", w.length === 2 && w.every((x) => x.value.length <= 3800));
+const back = s.readSessionCookie(jar(w.map((x) => ({ name: x.name, value: x.value }))));
+ok("chunks reassemble", JSON.stringify(s.unseal(back, "u1")) === JSON.stringify(big));
+const shrink = s.sessionCookieWrites("u1", t, jar(w.map((x) => ({ name: x.name, value: x.value }))));
+ok("shrink deletes stale chunks", shrink.filter((x) => x.maxAge === 0).length === 2 && shrink.some((x) => x.name === s.SESSION_COOKIE && x.maxAge > 0));
+ok("sign-out deletes", s.sessionCookieWrites("u1", null, jar([{ name: s.SESSION_COOKIE, value: "x" }])).every((x) => x.maxAge === 0));
+const next = { accessToken: "a2", refreshToken: "r2", expiresAt: Date.now() + 3600e3 };
+await s.withSession("u1", t, () => s.cookieTokenStore.saveTokens("u1", next));
+ok("second tab gets rotated pair", (await s.withSession("u1", t, () => s.cookieTokenStore.loadTokens("u1"))).result?.refreshToken === "r2");
+ok("other session cannot load", (await s.withSession("u2", t, () => s.cookieTokenStore.loadTokens("u1"))).result === null);
+ok("cookie flags", s.serializeCookie({ name: "n", value: "v", maxAge: 5 }, true) === "n=v; Path=/; Max-Age=5; HttpOnly; SameSite=Lax; Secure");
