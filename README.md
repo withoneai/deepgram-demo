@@ -134,29 +134,31 @@ A custom tool pins one One action behind a name and a schema written for the mod
 
 Each one is the action id, a parameter schema, and two small functions: `request` maps the model's arguments to the action's request, and `result` trims the response to what a spoken answer needs. A tool only appears for users who connected its platform and whose access allows the action, and it runs under their grant like everything else.
 
-**Write one with the One CLI**
+**How to add one: ask your coding agent, which uses the One CLI**
+
+You don't look up action ids or read API docs yourself. Your coding agent (Claude Code, Cursor, Codex or any agent with a terminal) does it with the One CLI. That's how the two examples here were built.
+
+One-time setup, done by you:
 
 ```bash
-npm i -g @withone/cli && one init
-
-# 1. Find the action and read its docs
-one actions find hubspot "search contacts" --task "look up a CRM contact"
-one actions load <actionId>
-
-# 2. Try it against a real connection before writing code
-one list                                            # your connection keys
-one actions execute hubspot <actionId> <connectionKey> -d '{"query":"jane"}'
+npm i -g @withone/cli
+one init        # signs you in to One and installs the One skill into your coding agents
+one add hubspot # connect the app you want a tool for, so the agent can test against it
 ```
 
-Then copy [`attio-search-people.ts`](lib/tools/custom/attio-search-people.ts), put in the action id, method and path, write `request` and `result`, and add the tool to `CUSTOM_TOOLS` in [`lib/tools/custom/index.ts`](lib/tools/custom/index.ts).
+Then ask your agent, from this repo:
 
-**Or let your coding agent write it, with the One MCP server**
+> Add a custom tool that searches HubSpot contacts. Use the One CLI to find the action and read its docs, run it once against my connection to see the real response, then write `lib/tools/custom/hubspot-search-contacts.ts` following `attio-search-people.ts` and add it to `CUSTOM_TOOLS`.
 
-Add `https://mcp.withone.ai/mcp` to Claude Code, Cursor or any MCP client, then ask:
+The agent runs the same three steps the voice agent uses at runtime, through the CLI:
 
-> Using One, find the action that searches HubSpot contacts, read its docs, run it once to check the response, and write `lib/tools/custom/hubspot-search-contacts.ts` following `attio-search-people.ts`. Then add it to `CUSTOM_TOOLS`.
+```bash
+one --agent actions find hubspot "search contacts" --task "look up a CRM contact"  # picks the action, returns its docs
+one --agent actions load <actionId>                                                # any docs section the find left out
+one --agent actions execute hubspot <actionId> <connectionKey> -d '{"query":"jane"}'  # a real call, to see the response shape
+```
 
-The agent uses `find_one_actions` and `execute_one_action` to get the same id and docs the CLI shows, and checks the real response shape before writing `result`.
+From that it fills in the action id, method and path, writes `request` from the docs and `result` from the real response, and registers the tool in [`lib/tools/custom/index.ts`](lib/tools/custom/index.ts). Restart `npm run dev`, and the tool shows up for every user who connected HubSpot with access to that action. Check it with `npm run print-tools -- hubspot`.
 
 ## Speech
 
