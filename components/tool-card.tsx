@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import type { Entry, Receipt } from "@/lib/use-voice-agent";
+import { logo, platformName } from "@/lib/platforms";
 
 type ToolEntry = Extract<Entry, { kind: "tool" }>;
 
-const APP: Record<string, string> = { "google-calendar": "calendar", gmail: "email", attio: "Attio", notion: "Notion" };
-const appName = (platform?: string) => (platform ? APP[platform] ?? platform : "your apps");
-const logo = (platform?: string) => `https://assets.withone.ai/connectors/${platform || "one"}.svg`;
+/** How a card names an app: "your calendar" reads better than "Google Calendar" mid-sentence. */
+const SPOKEN: Record<string, string> = { "google-calendar": "calendar", gmail: "email" };
+const appName = (platform?: string) => (platform ? SPOKEN[platform] ?? platformName(platform) : "your apps");
 
 function parse(s: string): Record<string, any> {
   try {
@@ -23,61 +24,13 @@ const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? on
 function describe(name: string, args: Record<string, any>, r?: Receipt): { doing: string; done: string; blocked?: string; outcome?: string; minor?: boolean } {
   const c: any = r?.content;
   switch (name) {
-    case "calendar_upcoming_events": {
-      const span = args.days_ahead ? `the next ${count(Number(args.days_ahead), "day")}` : "the next couple of days";
-      return {
-        doing: args.search ? `Looking for "${args.search}" on your calendar` : `Checking your calendar for ${span}`,
-        done: args.search ? `Looked for "${args.search}" on your calendar` : `Checked your calendar for ${span}`,
-        outcome: Array.isArray(c) ? (c.length ? count(c.length, "event") : "Nothing scheduled") : undefined,
-      };
+    case "find_actions": {
+      const apps = [...new Set<string>((args.requests ?? [{ platform: args.platform }]).map((q: any) => q?.platform).filter(Boolean))].map(platformName);
+      const where = apps.length ? apps.join(" and ") : "your apps";
+      return { doing: `Looking up how to do that in ${where}`, done: `Found the way to do it in ${where}`, minor: true };
     }
-    case "calendar_check_availability":
-      return {
-        doing: "Checking when you're free",
-        done: "Checked when you're free",
-        outcome: c?.busy ? (c.busy.length ? `${count(c.busy.length, "busy block")}` : "Wide open") : undefined,
-      };
-    case "calendar_create_event":
-      return {
-        doing: `Adding "${args.title ?? "event"}" to your calendar`,
-        done: `Added "${args.title ?? "event"}" to your calendar`,
-        blocked: `Couldn't add "${args.title ?? "event"}" to your calendar`,
-        outcome: c?.created ? "Booked" : undefined,
-      };
-    case "email_unread":
-      return {
-        doing: args.from ? `Checking email from ${args.from}` : "Checking your unread email",
-        done: args.from ? `Checked email from ${args.from}` : "Checked your unread email",
-        outcome: c?.emails ? (c.emails.length ? count(c.emails.length, "unread email") : "Inbox is clear") : undefined,
-      };
-    case "crm_lookup":
-      return {
-        doing: `Looking up ${args.query ?? "someone"} in Attio`,
-        done: `Looked up ${args.query ?? "someone"} in Attio`,
-        outcome: Array.isArray(c) ? (c.length ? `Found ${count(c.length, "match", "matches")}` : "No match") : undefined,
-      };
-    case "crm_recent": {
-      const kind = args.kind === "companies" ? "companies" : "people";
-      return {
-        doing: `Checking the newest ${kind} in Attio`,
-        done: `Checked the newest ${kind} in Attio`,
-        outcome: Array.isArray(c) && c[0]?.name ? `Latest: ${c[0].name}` : Array.isArray(c) ? "Nothing yet" : undefined,
-      };
-    }
-    case "notion_search": {
-      const q = String(args.query ?? "").trim();
-      return {
-        doing: q ? `Searching Notion for "${q}"` : "Opening your recent Notion pages",
-        done: q ? `Searched Notion for "${q}"` : "Opened your recent Notion pages",
-        outcome: c?.opened?.title ? `Opened "${c.opened.title}"` : c?.matches ? (c.matches.length ? count(c.matches.length, "page") : "No pages found") : undefined,
-      };
-    }
-    case "notion_read_page":
-      return { doing: "Reading the Notion page", done: "Read the Notion page", outcome: c?.content ? "Got the content" : undefined };
-    case "find_actions":
-      return { doing: `Figuring out how to do that in ${appName(args.platform)}`, done: `Figured out how to do that in ${appName(args.platform)}`, minor: true };
     case "get_action_details":
-      return { doing: "Reading up on the next step", done: "Read up on the next step", minor: true };
+      return { doing: "Reading up on another way to do it", done: "Read up on another way to do it", minor: true };
     case "run_action": {
       const title = r?.actionTitle
         ? r.actionTitle.replace(/\s*\([^)]*\)/g, "").replace(/’/g, "'").replace(/^(\w)/, (m) => m.toLowerCase())
@@ -85,10 +38,20 @@ function describe(name: string, args: Record<string, any>, r?: Receipt): { doing
       const items = Array.isArray(c) ? c.length : Array.isArray(c?.results) ? c.results.length : undefined;
       return {
         doing: `Working in ${appName(args.platform)}`,
-        done: r?.actionTitle ? `${appName(args.platform) === "email" ? "Email" : appName(args.platform)}: ${title}` : `Worked in ${appName(args.platform)}`,
+        done: r?.actionTitle ? `${platformName(args.platform)}: ${title}` : `Worked in ${appName(args.platform)}`,
         outcome: items !== undefined ? (items ? count(items, "result") : "Nothing found") : undefined,
       };
     }
+    case "search_people": {
+      const n = Array.isArray(c?.people) ? c.people.length : undefined;
+      return {
+        doing: `Searching Attio for "${args.query ?? ""}"`,
+        done: `Attio: searched people for "${args.query ?? ""}"`,
+        outcome: n !== undefined ? (n ? count(n, "person", "people") : "Nobody found") : undefined,
+      };
+    }
+    case "draft_email":
+      return { doing: `Drafting an email to ${args.to ?? "them"}`, done: `Gmail: saved a draft to ${args.to ?? "them"}`, outcome: c?.saved ? `"${args.subject ?? ""}"` : undefined };
     default:
       return { doing: `Working in ${appName(r?.platform)}`, done: `Worked in ${appName(r?.platform)}` };
   }
@@ -122,14 +85,25 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
   const [open, setOpen] = useState(false);
   const r = entry.receipt;
   const args = parse(entry.args);
-  const platform = r?.platform || (typeof args.platform === "string" ? args.platform : undefined) || platformFor(entry.name);
+  const platform = r?.platform || (typeof args.platform === "string" ? args.platform : undefined) || args.requests?.[0]?.platform;
   const text = describe(entry.name, args, r);
-  const state = entry.pending ? "pending" : r?.blockedByGrant ? "blocked" : r?.ok ? "ok" : "failed";
+  // A write the agent tried before asking: not a failure, the guard doing its job.
+  const asking = (r?.content as any)?.error === "needs_confirmation";
+  const state = entry.pending ? "pending" : r?.blockedByGrant ? "blocked" : r?.ok || asking ? "ok" : "failed";
+
+  if (asking) {
+    return (
+      <div className="rise flex items-center gap-2 text-[12px] text-mute">
+        <StatusIcon state="ok" />
+        <span>Checking with you before changing anything in {appName(platform)}</span>
+      </div>
+    );
+  }
 
   const headline = entry.pending ? `${text.doing}…` : state === "blocked" ? text.blocked ?? `Couldn't do that in ${appName(platform)}` : text.done;
   const sub =
     state === "blocked"
-      ? `You've only allowed viewing here. One stopped it before it reached ${appName(platform) === "email" ? "Gmail" : appName(platform)}.`
+      ? `You've only allowed viewing here. One stopped it before it reached ${platformName(platform)}.`
       : state === "failed"
         ? "That didn't work"
         : state === "ok"
@@ -138,7 +112,7 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
 
   if (text.minor && state !== "failed") {
     return (
-      <div className="rise flex items-center gap-2 pl-3 text-[12px] text-mute">
+      <div className="rise flex items-center gap-2 text-[12px] text-mute">
         <StatusIcon state={state} />
         <span>{headline}</span>
       </div>
@@ -179,11 +153,4 @@ export function ToolCard({ entry }: { entry: ToolEntry }) {
       )}
     </div>
   );
-}
-
-function platformFor(name: string) {
-  if (name.startsWith("calendar_")) return "google-calendar";
-  if (name === "email_unread") return "gmail";
-  if (name === "crm_lookup") return "attio";
-  return undefined;
 }

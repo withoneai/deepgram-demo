@@ -1,6 +1,5 @@
 import "server-only";
 import type { Connection, OneBackend } from "./one";
-import { notionTitle } from "./tools";
 
 /**
  * Words the speech model should expect: names from the user's own apps.
@@ -8,6 +7,12 @@ import { notionTitle } from "./tools";
  * is heard as one word instead of "fire flies". Pulled live, capped, and never
  * allowed to slow the session: anything slower than the budget is skipped.
  */
+
+/** A Notion page's title, wherever Notion keeps it. */
+function notionTitle(r: any): string {
+  const prop: any = Object.values(r?.properties ?? {}).find((p: any) => p?.type === "title");
+  return ((prop?.title ?? r?.title ?? []) as any[]).map((t) => t.plain_text).join("").trim();
+}
 
 const BASE = ["One", "Deepgram", "Attio", "Notion", "Gmail", "Google Calendar"];
 const MAX_TERMS = 60;

@@ -32,7 +32,12 @@ export type ActionCall = {
 
 export type ActionResult = { status: number; ok: boolean; blockedByGrant: boolean; data: unknown };
 
-export type CatalogAction = { _id: string; title: string; method: string; path: string };
+/** `tags` includes "custom" for actions One serves itself: they take the connection key in the body. */
+export type CatalogAction = { _id: string; title: string; method: string; path: string; tags?: string[] };
+
+/** One's pick for one intent: the action, its docs, and the runners-up. */
+export type FoundAction = CatalogAction & { knowledge: string };
+export type FindAnswer = { platform: string; intent: string; selected: FoundAction[]; alternatives: CatalogAction[] };
 
 export interface OneBackend {
   mode: "connect" | "key";
@@ -43,6 +48,13 @@ export interface OneBackend {
   listActions(platform: string): Promise<CatalogAction[]>;
   /** The action's markdown docs (parameters, rules), or null. */
   getKnowledge(actionId: string): Promise<ActionKnowledge | null>;
+  /**
+   * One's own action picker, the one behind `one actions find` in the CLI:
+   * search plus a model that chooses, with each pick's docs, for several
+   * intents in one call. Null when One refuses it, so the caller can fall
+   * back to ranking the catalog itself.
+   */
+  findActions(requests: { platform: string; intent: string }[], task: string): Promise<FindAnswer[] | null>;
   /** Who is connected, or null when One will not say. */
   getUser(): Promise<OneUser | null>;
 }
@@ -64,9 +76,26 @@ async function knowledgeFrom(response: Response): Promise<ActionKnowledge | null
   if (!response.ok) return null;
   const row = (await response.json())?.rows?.[0];
   if (!row?.knowledge) return null;
-  return { _id: String(row._id), title: String(row.title), method: String(row.method), path: String(row.path), platform: String(row.connectionPlatform), knowledge: String(row.knowledge) };
+  return { _id: String(row._id), title: String(row.title), method: String(row.method), path: String(row.path), tags: row.tags ?? [], platform: String(row.connectionPlatform), knowledge: String(row.knowledge) };
 }
 
+const FIND_PATH = "/available-actions/find";
+
+async function findFrom(response: Response): Promise<FindAnswer[] | null> {
+  if (!response.ok) return null;
+  const rows = await response.json();
+  if (!Array.isArray(rows)) return null;
+  const action = (a: any): CatalogAction => ({ _id: String(a.systemId), title: String(a.title), method: String(a.method), path: String(a.path), tags: a.tags ?? [] });
+  return rows.map((r: any) => ({
+    platform: String(r.platform),
+    intent: String(r.intent),
+    selected: (r.selected ?? []).map((a: any) => ({ ...action(a), knowledge: String(a.knowledge ?? "") })),
+    alternatives: [...(r.alsoSelected ?? []), ...(r.alternatives ?? [])].map(action),
+  }));
+}
+
+const findBody = (requests: { platform: string; intent: string }[], task: string) =>
+  JSON.stringify({ requests, task, knowledgeAgent: false });
 
 // ---------------------------------------------------------------- connect
 
@@ -81,6 +110,8 @@ const connectBackend: OneBackend = {
   runAction: (call) => oneConnect().runAction(uid(), call),
   listActions: (platform) => oneConnect().listActions(uid(), platform),
   getKnowledge: async (actionId) => knowledgeFrom(await oneConnect().fetch(uid(), `/knowledge?_id=${encodeURIComponent(actionId)}`)),
+  findActions: async (requests, task) =>
+    findFrom(await oneConnect().fetch(uid(), FIND_PATH, { method: "POST", headers: { "Content-Type": "application/json" }, body: findBody(requests, task) })),
   // Needs the user:profile:read scope (requested in ./one-connect.ts).
   getUser: async () => {
     if (!(await oneConnect().isConnected(uid()))) return null;
@@ -110,8 +141,8 @@ async function devConnections(): Promise<Connection[]> {
   return rows;
 }
 
-async function devFetch(pathAndQuery: string) {
-  return fetch(`${ONE_API}${pathAndQuery}`, { headers: { "x-one-secret": oneSecret() } });
+async function devFetch(pathAndQuery: string, init: RequestInit = {}) {
+  return fetch(`${ONE_API}${pathAndQuery}`, { ...init, headers: { ...init.headers, "x-one-secret": oneSecret() } });
 }
 
 const devBackend: OneBackend = {
@@ -122,12 +153,14 @@ const devBackend: OneBackend = {
       const r = await devFetch(`/knowledge?connectionPlatform=${encodeURIComponent(platform)}&limit=100&page=${page}`);
       if (!r.ok) break;
       const body = await r.json();
-      rows.push(...(body.rows ?? []).map((x: any) => ({ _id: String(x._id), title: String(x.title), method: String(x.method), path: String(x.path) })));
+      rows.push(...(body.rows ?? []).map((x: any) => ({ _id: String(x._id), title: String(x.title), method: String(x.method), path: String(x.path), tags: x.tags ?? [] })));
       if (page >= (body.pages ?? 1)) break;
     }
     return rows;
   },
   getKnowledge: async (actionId) => knowledgeFrom(await devFetch(`/knowledge?_id=${encodeURIComponent(actionId)}`)),
+  findActions: async (requests, task) =>
+    findFrom(await devFetch(FIND_PATH, { method: "POST", headers: { "Content-Type": "application/json" }, body: findBody(requests, task) })),
   // /v1/users/me takes a dashboard session only; whoami takes an API key.
   getUser: async () => userFrom(await devFetch("/users/whoami")),
   isConnected: async () => (await devConnections()).length > 0,

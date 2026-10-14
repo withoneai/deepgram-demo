@@ -133,7 +133,7 @@ export function useVoiceAgent() {
   );
 
   /** `preloaded` is the page's own copy of /api/agent/config; reused while fresh to skip a round trip. */
-  const start = useCallback(async (preloaded?: { settings: unknown; loadedAt?: number }) => {
+  const start = useCallback(async (preloaded?: { settings: unknown; loadedAt?: number; model?: string }) => {
     if (live.current) return;
     live.current = true;
     setEntries([]);
@@ -142,7 +142,7 @@ export function useVoiceAgent() {
 
     try {
       const fresh = preloaded?.settings && preloaded.loadedAt && Date.now() - preloaded.loadedAt < 5 * 60_000;
-      const config = fresh ? preloaded : await fetch(`/api/agent/config?tz=${encodeURIComponent(timeZone)}`).then((r) => r.json());
+      const config = fresh ? preloaded : await fetch(`/api/agent/config?tz=${encodeURIComponent(timeZone)}&model=${encodeURIComponent(preloaded?.model ?? "")}`).then((r) => r.json());
 
       const ac = new AudioContext();
       ctx.current = ac;

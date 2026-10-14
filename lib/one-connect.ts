@@ -1,4 +1,4 @@
-import { createOneConnect } from "@withone/connect/server";
+import { createOneConnect, type OneConnect } from "@withone/connect/server";
 import { cookies } from "next/headers";
 import { REFRESH_AHEAD_MS, SID_COOKIE, cookieTokenStore, currentUid, readSessionCookie, unseal, withSession } from "./session";
 
@@ -19,10 +19,11 @@ const SCOPES = [
   "user:profile:read",
 ];
 
-let client: ReturnType<typeof createOneConnect> | undefined;
+let client: OneConnect | undefined;
 
 export function oneConnect() {
   client ??= createOneConnect({
+    mode: "token",
     clientId: process.env.ONE_CLIENT_ID!,
     clientSecret: process.env.ONE_CLIENT_SECRET!,
     redirectUri: process.env.ONE_REDIRECT_URI!,
