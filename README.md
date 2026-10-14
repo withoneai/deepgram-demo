@@ -25,6 +25,10 @@ cp .env.example .env.local   # add DEEPGRAM_API_KEY, then the Connect values bel
 npm run dev                  # app on http://localhost:3030, relay on :3031
 ```
 
+Until `.env.local` has a Deepgram key and a way into One, the app opens on a setup screen instead of the agent. It checks each value on every refresh (it only sees whether a value is set, never the value), ticks off what's done, and walks you through the Connect app. Open `/?setup` to see it again once everything is set.
+
+![The setup screen: Deepgram key done, Connect app values still missing](docs/setup.png)
+
 Use Chrome and wear headphones so the agent does not hear itself. You can also type a turn in the box under the call.
 
 ### Create the Connect app in One
