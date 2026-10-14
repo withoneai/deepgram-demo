@@ -31,7 +31,7 @@ Use Chrome and wear headphones so the agent does not hear itself. You can also t
 
 Connect is what lets each person who uses your agent bring their own apps. You create one Connect app in the One dashboard, and every user grants it access to their tools on One's consent page. It takes about two minutes.
 
-**1. Open the studio.** Sign in at [app.withone.ai](https://app.withone.ai) and go to **Developers → Connect → New app**. The form is on the left, and a live preview of the consent card your users will see is on the right. There are three steps.
+**1. Open the studio.** Sign in and open [**Developers → Connect**](https://app.withone.ai/developers/connect) in the One dashboard, then click **New app**. The form is on the left, and a live preview of the consent card your users will see is on the right. There are three steps.
 
 **2. Who is asking.** This is what users see on the consent page.
 
