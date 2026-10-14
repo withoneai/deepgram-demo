@@ -27,14 +27,62 @@ npm run dev                  # app on http://localhost:3030, relay on :3031
 
 Use Chrome and wear headphones so the agent does not hear itself. You can also type a turn in the box under the call.
 
-### Let each user connect their own apps
+### Create the Connect app in One
 
-1. In the One dashboard, open **Developers → Connect → New app**.
-2. Register the redirect URI `http://localhost:3030/api/one/callback`.
-3. Choose the apps the agent may work in. Any app works; `ONE_FEATURED_PLATFORMS` only picks the logos on the Connect button.
-4. Put the client id, client secret and permission set id in `.env.local`, and restart.
+Connect is what lets each person who uses your agent bring their own apps. You create one Connect app in the One dashboard, and every user grants it access to their tools on One's consent page. It takes about two minutes.
 
-Press **Connect your apps**, sign in to One with the emailed code, pick your apps and set the access for each.
+**1. Open the studio.** Sign in at [app.withone.ai](https://app.withone.ai) and go to **Developers → Connect → New app**. The form is on the left, and a live preview of the consent card your users will see is on the right. There are three steps.
+
+**2. Who is asking.** This is what users see on the consent page.
+
+| Field | What to put |
+| --- | --- |
+| **Name** | Required. For example "Deepgram Voice Agent". |
+| **Logo URL** | Optional. A public, square image, around 128px. |
+| **Why you're asking** | Optional, up to 200 characters. For example "Talks to your calendar, email and CRM so you can get things done out loud." |
+
+**3. What it asks for.** Pick one:
+
+- **Everything the user has connected** (recommended for this demo). Users tick which of their connections to share, and the agent works in all of them. This is the "any app" story, and you leave `ONE_PERMISSION_SET` empty.
+- **Specific connectors and scopes.** Pick each app and how far the agent may go: **Read only**, **Read & write** (no deletes), **Full access**, or **Custom** (individual actions). Users can narrow this on the consent page, never widen it. Creating the app saves the list as its **Default ask**, and its **Ask id** goes in `ONE_PERMISSION_SET`.
+
+The agent reads the access back on every session, so its prompt and tools match what each user allowed. A read-only grant gets an agent that only reads.
+
+**4. Where users return.** Under **Redirect URIs**, add this exactly:
+
+```
+http://localhost:3030/api/one/callback
+```
+
+The match is exact (scheme, host, port, path). Plain `http` is only accepted for localhost. Add your deployed URL on its own line when you ship, for example `https://voice.yourapp.com/api/one/callback`.
+
+**5. Create the app and copy the credentials.** Click **Create app**. On the app's page, under **Credentials**:
+
+- **Client ID**: copy it with the chip next to it.
+- **Client secret**: starts with `one_secret_` and is **shown once**. Copy it now. If you lose it, **Regenerate** makes a new one and the old one stops working.
+- **Ask id**: only for a Specific app. It's on the **What it asks for** card or the **Asks** tab.
+
+This demo runs Connect in token mode, so you don't need a connect key (`sk_live_…`). Each user's token pair is sealed into their own browser cookie (see [Sessions](#sessions-tokens-never-touch-the-server)).
+
+**6. Fill in `.env.local` and restart.**
+
+```bash
+ONE_CLIENT_ID=...
+ONE_CLIENT_SECRET=one_secret_...
+ONE_REDIRECT_URI=http://localhost:3030/api/one/callback   # exactly the registered URI
+ONE_PERMISSION_SET=                                       # the Ask id, or empty for "Everything"
+ONE_FEATURED_PLATFORMS=google-calendar,gmail,attio        # logos on the button only; any app works
+```
+
+**7. Connect.** Open http://localhost:3030 and press **Connect your apps**. Sign in to One with the emailed code, pick your apps, set the access for each and approve. You come back connected, and the left panel lists your apps and the tools the agent got.
+
+To revoke, use **Disconnect from One** in the app, which clears the cookie. To revoke the grant itself, remove the app from your One dashboard, and it takes effect on the next call. Full reference: [One Connect docs](https://www.withone.ai/docs/connect/setup).
+
+**Troubleshooting**
+
+- *"redirect URI doesn't match"*: `ONE_REDIRECT_URI` and the registered URI differ, even by a trailing slash or a port.
+- *The consent page asks for the wrong apps*: check `ONE_PERMISSION_SET`. Empty means everything the user connected.
+- *Lost the client secret*: **Regenerate** it on the app's page and update `.env.local`.
 
 No Connect app yet? Leave those values empty and set `ONE_SECRET` instead. The agent then uses the first connection of each platform in your own One account, with full access. Good for trying the voice loop, not for other people.
 
