@@ -1,6 +1,6 @@
 # Deepgram × One: a voice agent for any app
 
-Talk to your apps out loud. This is a voice agent on [Deepgram's Voice Agent API](https://developers.deepgram.com/docs/voice-agent) that can work in any app a user connects through [One](https://www.withone.ai): calendar, email, CRM, Notion, Linear, Stripe, HubSpot and 690+ others. Each user brings their own apps with [One Connect](https://www.withone.ai/products/connect) and decides what the agent may do in each one.
+Talk to your apps out loud. This is a voice agent on [Deepgram's Voice Agent API](https://developers.deepgram.com/docs/voice-agent) that can work in any app a user connects through [One](https://www.withone.ai): calendar, email, CRM, Notion, Linear, Stripe, HubSpot and the rest of the 980+ apps One supports. Each user brings their own apps with [One Connect](https://www.withone.ai/products/connect) and decides what the agent may do in each one.
 
 There is no code per app. Three general tools reach everything, and you add a custom tool (one small file) only when you want a faster path for a job that comes up all the time.
 
